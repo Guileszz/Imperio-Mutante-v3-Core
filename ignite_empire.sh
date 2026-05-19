@@ -31,9 +31,9 @@ if [ ! -f "deploy/requirements.txt" ]; then
     exit 1
 fi
 
-# 2. Verificação de Integridade de Inteligência (v4.0.0 Beta)
+# 2. Verificação de Integridade de Inteligência (v4.1.0 Alpha)
 echo -e "${YELLOW}[*] Validando núcleos de inteligência...${NC}"
-INTEL_FILES=("intelligence/bio_wealth_engine.py" "intelligence/wallet_manager.py" "intelligence/shadow_market_oracle.py" "intelligence/chronos.py")
+INTEL_FILES=("intelligence/bio_wealth_engine.py" "intelligence/wallet_manager.py" "intelligence/shadow_market_oracle.py" "intelligence/chronos.py" "intelligence/ancestral_memory.py" "intelligence/synthesis_core.py")
 for file in "${INTEL_FILES[@]}"; do
     if [ -f "$file" ]; then
         echo -e "${GREEN}[+] Módulo verificado: $file${NC}"
@@ -41,6 +41,15 @@ for file in "${INTEL_FILES[@]}"; do
         echo -e "${RED}[!] ALERTA: Módulo crítico ausente: $file${NC}"
     fi
 done
+
+# 2.1 Verificação da Memória Ancestral
+echo -e "${YELLOW}[*] Verificando saúde da Memória Ancestral...${NC}"
+if [ -d "data/vector_db" ]; then
+    echo -e "${GREEN}[+] Base de Dados Vetorial encontrada.${NC}"
+else
+    echo -e "${YELLOW}[!] Base de Dados Vetorial não encontrada. Será inicializada pelo Nexus Core.${NC}"
+fi
+mkdir -p data/vector_db
 
 # 3. Geração de stubs gRPC se necessário
 if [ ! -f "core/neural_bridge_pb2.py" ]; then
@@ -68,26 +77,34 @@ export PORT=8080
 python3 interface/cockpit.py > /dev/null 2>&1 &
 COCKPIT_PID=$!
 
-# 5. Verificação de Health
-sleep 3
-if ps -p $BRIDGE_PID > /dev/null && ps -p $COCKPIT_PID > /dev/null; then
+echo -e "${YELLOW}[*] Inicializando NEXUS CORE v4.0.0 Beta...${NC}"
+python3 core/nexus_core.py > /dev/null 2>&1 &
+NEXUS_PID=$!
+
+# 5. Verificação de Health e Diagnóstico Automatizado
+sleep 5
+if ps -p $BRIDGE_PID > /dev/null && ps -p $COCKPIT_PID > /dev/null && ps -p $NEXUS_PID > /dev/null; then
+    echo -e "${GREEN}Services started. Running cluster diagnostics...${NC}"
+    python3 core/diagnostic_cluster.py
+    
     echo -e "${GREEN}
 =====================================================
 🚀 CLUSTER IMPÉRIO MUTANTE ATIVADO COM SUCESSO!
 =====================================================
 NEURAL BRIDGE PID: $BRIDGE_PID
 COCKPIT DASHBOARD: http://localhost:8080 (PID: $COCKPIT_PID)
+NEXUS CORE PID: $NEXUS_PID
 LOGS: Monitorando logs em tempo real...
 =====================================================
 ${NC}"
 else
     echo -e "${RED}[!] Falha na ignição. Verifique os logs.${NC}"
-    kill $BRIDGE_PID $COCKPIT_PID 2>/dev/null || true
+    kill $BRIDGE_PID $COCKPIT_PID $NEXUS_PID 2>/dev/null || true
     exit 1
 fi
 
 # Keep alive e gerenciamento de interrupção
-trap "echo -e '${RED}Shutting down cluster...${NC}'; kill $BRIDGE_PID $COCKPIT_PID; exit" INT TERM
+trap "echo -e '${RED}Shutting down cluster...${NC}'; kill $BRIDGE_PID $COCKPIT_PID $NEXUS_PID; exit" INT TERM
 
 echo -e "${BLUE}[i] Pressione Ctrl+C para encerrar a operação.${NC}"
 wait

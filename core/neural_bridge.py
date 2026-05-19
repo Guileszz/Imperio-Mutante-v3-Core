@@ -22,6 +22,7 @@ logger = logging.getLogger("NEURAL-BRIDGE")
 class NeuralBridgeServicer(neural_bridge_pb2_grpc.NeuralBridgeServicer):
     def __init__(self):
         self.nodes_data = {}
+        self.mutation_callback = None
 
     def SendTelemetry(self, request, context):
         node_id = request.node_id
@@ -39,7 +40,15 @@ class NeuralBridgeServicer(neural_bridge_pb2_grpc.NeuralBridgeServicer):
 
     def ExchangeMutation(self, request, context):
         logger.info(f"Mutation exchange with {request.node_id}: {request.mutation_type}")
-        # Logica de mutação pode ser expandida aqui
+        if self.mutation_callback:
+            # Run callback in a way that doesn't block gRPC thread if it's async
+            if asyncio.iscoroutinefunction(self.mutation_callback):
+                asyncio.run_coroutine_threadsafe(
+                    self.mutation_callback(request.node_id, request.payload, request.mutation_type),
+                    asyncio.get_event_loop()
+                )
+            else:
+                self.mutation_callback(request.node_id, request.payload, request.mutation_type)
         return request 
 
     def GetNodeStatus(self, request, context):
@@ -93,6 +102,22 @@ class NeuralBridge:
             except Exception as e:
                 logger.error(f"Failed to send telemetry to {target_address}: {e}")
                 return False
+
+    async def exchange_mutation(self, target_address: str, node_id: str, payload: str, mutation_type: str) -> Optional[str]:
+        """Envia uma mutação/estado para outro nó via gRPC."""
+        async with grpc.aio.insecure_channel(target_address) as channel:
+            stub = neural_bridge_pb2_grpc.NeuralBridgeStub(channel)
+            try:
+                request = neural_bridge_pb2.MutationData(
+                    node_id=node_id,
+                    payload=payload,
+                    mutation_type=mutation_type
+                )
+                response = await stub.ExchangeMutation(request, timeout=2.0)
+                return response.payload
+            except Exception as e:
+                logger.error(f"Failed to exchange mutation with {target_address}: {e}")
+                return None
 
     # Compatibilidade com v1.0
     async def connect_to_model(self, model_id: str, endpoint: str) -> bool:

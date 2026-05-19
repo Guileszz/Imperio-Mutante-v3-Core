@@ -33,7 +33,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - EVOLUTION - %(leve
 logger = logging.getLogger("EVOLUTION-ENGINE")
 
 class EvolutionEngine:
-    def __init__(self, config_path: str = "legacy/supra_codex.json"):
+    def __init__(self, config_path: str = "config/supra_codex.json"):
         self.config_path = config_path
         self.telemetry = TelemetrySystem()
         self.oracle = ShadowOracle()
@@ -67,7 +67,7 @@ class EvolutionEngine:
             "evolution_cycle_interval": 3600
         }
 
-    async def collect_evolution_data(self) -> Dict[str, Any]:
+    async def collect_evolution_data(self, current_roi: float = 0.0, profit_history: List[Dict] = None) -> Dict[str, Any]:
         """
         Consome APIs internas e telemetria para obter o estado atual e sentimento de mercado.
         """
@@ -93,8 +93,51 @@ class EvolutionEngine:
             "telemetry": telemetry_data,
             "market": market_data,
             "chronos": chronos_predictions,
+            "current_roi": current_roi,
+            "profit_history": profit_history or [],
             "current_config": self._get_full_config()
         }
+
+    async def get_strike_decision(self, market_data: Dict, roi: float, balances: Dict) -> Dict[str, Any]:
+        """
+        Consulta o Gemini para tomar uma decisão estratégica de Strike.
+        """
+        if not self.model:
+            return {"execute": False, "reason": "Gemini offline"}
+
+        prompt = f"""[SISTEMA: DECISÃO ESTRATÉGICA /STRIKE]
+Analise o cenário e decida se devemos executar o protocolo /STRIKE para maximizar o Néctar.
+
+ESTADO DO MERCADO:
+{json.dumps(market_data, indent=2)}
+
+ROI ATUAL (24h): {roi:.2%}
+SALDOS: {json.dumps(balances, indent=2)}
+
+OBJETIVOS:
+1. Maximização de Néctar (Lucro).
+2. Soberania Financeira (Preservação de Capital).
+3. Autonomia Total (Decidir sem medo, mas com precisão).
+
+FORMATO DE SAÍDA (JSON APENAS):
+{{
+  "execute": bool,
+  "asset": "BTC/USDT",
+  "intensity": float,
+  "reason": "Explicação estratégica concisa"
+}}
+"""
+        try:
+            response = await asyncio.to_thread(self.model.generate_content, prompt)
+            text = response.text.strip()
+            if text.startswith("```json"):
+                text = text[7:-3]
+            elif text.startswith("```"):
+                text = text[3:-3]
+            return json.loads(text.strip())
+        except Exception as e:
+            logger.error(f"Erro na decisão de strike: {e}")
+            return {"execute": False, "reason": f"Erro na IA: {e}"}
 
     def _get_full_config(self) -> Dict[str, Any]:
         try:
@@ -123,13 +166,20 @@ INTELIGÊNCIA DE MERCADO:
 PREDIÇÕES CHRONOS (Viabilidade de Lucro):
 {json.dumps(data['chronos'], indent=2)}
 
+ROI ATUAL: {data.get('current_roi', 0):.2%}
+HISTÓRICO DE LUCROS RECENTES:
+{json.dumps(data.get('profit_history', []), indent=2)}
+
 CONFIGURAÇÃO ATUAL (Resumo):
 {json.dumps(data['current_config'].get('settings', {}), indent=2)}
 
 OBJETIVO:
 Sugerir novos parâmetros para 'settings' ou 'nodes' no supra_codex.json que aumentem a eficiência baseada no sentimento de mercado e na carga do sistema.
+FOCO: Maximização de Néctar e Soberania Financeira.
+
 Se o mercado estiver 'bullish', aumente a agressividade (ex: reduzir delays, aumentar pesos de nós potentes).
 Se a carga estiver alta, otimize thresholds de latência.
+Se o ROI estiver baixo, busque estratégias mais conservadoras.
 
 FORMATO DE SAÍDA (JSON APENAS):
 [
@@ -197,16 +247,16 @@ Retorne APENAS o JSON array.
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2)
             
-            logger.info(f"Supra-Codex atualizado com {applied_count} mutações.")
+            logger.info(f"Supra-Codex atualizado with {applied_count} mutações.")
             return True
         except Exception as e:
             logger.error(f"Erro ao aplicar mutações: {e}")
             # Tentar rollback?
             return False
 
-    async def run_cycle(self):
+    async def run_cycle(self, roi: float = 0.0, history: List[Dict] = None):
         """Executa um ciclo completo de evolução."""
-        data = await self.collect_evolution_data()
+        data = await self.collect_evolution_data(roi, history)
         mutations = await self.generate_mutation_plan(data)
         if mutations:
             success = await self.apply_arsenal_mutation(mutations)

@@ -24,8 +24,21 @@ Este documento mapeia a topologia técnica e as interações entre os núcleos d
 │   ├── setup_local_ai.sh   # Instalador do ecossistema IA Local
 │   └── the_bridge.py       # Pipeline CI/CD autônomo
 ├── legacy/                 # Base de Dados e Supra-Codex
-└── docs/                   # Documentação de Soberania
+├── docs/                   # Documentação de Soberania
+└── SOVEREIGN_ATLAS.md      # Dossiê de Soberania e Auditoria
 ```
+
+---
+
+## 🏛️ Classificação Funcional (SOVEREIGN ATLAS)
+
+Para uma compreensão profunda da hierarquia, consulte o `SOVEREIGN_ATLAS.md`. As categorias principais são:
+
+*   **Cérebro (C2)**: Núcleo de comando e orquestração (`core/`).
+*   **Inteligência**: Processamento de dados, predição e lucro (`intelligence/`).
+*   **Defesa**: Monitoramento e proteção do sistema (`defense/`).
+*   **Interface**: Comunicação com o operador (`interface/`).
+*   **Infraestrutura**: Gestão de deploy e hardware (`deploy/`).
 
 ---
 

@@ -37,6 +37,9 @@ wheels/
 *.db
 *.sqlite
 *.sqlite3
+config/supra_codex.json.backup
+data/
+legacy/archive/
 legacy/vector_db/
 
 # Logs

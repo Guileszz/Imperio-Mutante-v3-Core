@@ -46,11 +46,14 @@ import httpx
 # Módulos customizados
 from core.local_brain_bridge import LocalBrainBridge
 from core.telemetry import TelemetrySystem as AdvancedTelemetry
+from core.diagnostic_cluster import ClusterDiagnostic
 from intelligence.social_ghost import SocialGhost
 from intelligence.predator_pricing import PredatorPricing
 from core.evolution_engine import EvolutionEngine
-from legacy.brain_drain import BrainDrain
-from legacy.the_forge import TheForge
+from core.p2p_consensus import P2PConsensus
+from core.neural_bridge import NeuralBridge
+from intelligence.synthesis_core import SynthesisCore
+from intelligence.the_forge import TheForge
 from defense.qa_engine import QAEngine
 from deploy.the_bridge import DeploymentBridge
 from intelligence.ancestral_memory import AncestralMemory
@@ -59,6 +62,7 @@ from intelligence.vortex_syntax import VortexSyntax
 from intelligence.ghost_shell import GhostShell
 from intelligence.bio_wealth_engine import BioWealthEngine
 from intelligence.wallet_manager import WalletManager
+from core.lattice_orchestrator import LatticeOrchestrator
 
 # =============================================================================
 # CONFIGURAÇÃO E INICIALIZAÇÃO
@@ -78,7 +82,7 @@ if GEMINI_API_KEY:
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-DB_PATH = "legacy/imperio_mutante.db"
+DB_PATH = "data/imperio_mutante.db"
 
 # Inicialização do Pool de Processos (32 threads Ryzen 9 - Otimização Total)
 executor = ProcessPoolExecutor(max_workers=32)
@@ -267,7 +271,7 @@ class NodeMetrics:
 # =============================================================================
 
 class NodeManager:
-    def __init__(self, config_path: str = "legacy/supra_codex.json"):
+    def __init__(self, config_path: str = "config/supra_codex.json"):
         self.config_path = config_path
         self.nodes: Dict[str, Dict] = {}
         self.metrics: Dict[str, NodeMetrics] = {}
@@ -436,7 +440,7 @@ notifier = TelegramNotifier(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID)
 social_ghost = SocialGhost()
 predator_pricing = PredatorPricing()
 evolution_engine = EvolutionEngine()
-brain_drain = BrainDrain()
+synthesis_core = SynthesisCore()
 the_forge = TheForge()
 qa_engine = QAEngine()
 the_bridge = DeploymentBridge()
@@ -445,8 +449,18 @@ chronos = Chronos(ancestral_memory)
 vortex_syntax = VortexSyntax()
 ghost_shell = GhostShell()
 local_brain = LocalBrainBridge(GEMINI_API_KEY)
-bio_wealth_engine = BioWealthEngine(ancestral_memory)
+bio_wealth_engine = BioWealthEngine(ancestral_memory, evolution_engine)
 wallet_manager = WalletManager()
+lattice_orchestrator = LatticeOrchestrator(DB_PATH)
+
+# Protocolo P2P "O Telhado"
+neural_bridge = NeuralBridge(port=str(50050 + (int(os.getenv("PORT", 8000)) - 8000)))
+p2p_consensus = P2PConsensus(
+    node_id=os.getenv("NODE_ID", "NEXUS-CORE"),
+    nodes_config=node_manager.nodes,
+    neural_bridge=neural_bridge
+)
+
 zenith_bridge = None
 shadow_bridge = None
 
@@ -466,10 +480,31 @@ async def lifespan(app: FastAPI):
             
         await node_manager.start_health_checks(client)
         await persistence.init_db()
+        await lattice_orchestrator.sync_satellites()
         
+        # Inicializa gRPC e Consenso P2P
+        asyncio.create_task(neural_bridge.start_server())
+        
+        async def p2p_callback(sender_id, payload, mutation_type):
+            if mutation_type == "CONSENSUS_SYNC":
+                try:
+                    state_dict = json.loads(payload)
+                    await p2p_consensus.handle_sync_request(sender_id, state_dict)
+                except Exception as e:
+                    logger.error(f"Erro ao processar sync P2P gRPC: {e}")
+
+        neural_bridge.servicer.mutation_callback = p2p_callback
+        asyncio.create_task(p2p_consensus.start_loop())
+
         # Inicia loop de evolução em background se configurado
         if node_manager.settings.get("evolution_engine", {}).get("auto_mutate"):
             asyncio.create_task(evolution_loop())
+
+        # Inicia Bio-Wealth Loop Autônomo
+        asyncio.create_task(bio_wealth_engine.start_autonomous_loop())
+
+        # Envia relatório de saúde inicial via Oráculo
+        asyncio.create_task(send_empire_health_report())
 
         logger.info("🚀 NEXUS CORE v4.0.0 Beta - BIO-WEALTH LOOP E SOBERANIA TOTAL ATIVADOS")
         yield
@@ -477,14 +512,62 @@ async def lifespan(app: FastAPI):
         executor.shutdown()
         logger.info("NEXUS CORE v4.0.0 Beta encerrado.")
 
+async def send_empire_health_report():
+    """Compila e envia o primeiro relatório de saúde do império via Telegram."""
+    await asyncio.sleep(10) # Aguarda inicialização completa dos serviços
+    try:
+        diag = ClusterDiagnostic()
+        report = await diag.run_all()
+        
+        stats = telemetry.get_system_stats()
+        balances = await wallet_manager.get_balances()
+        
+        html_msg = (
+            "🏛️ <b>RELATÓRIO DE SAÚDE DO IMPÉRIO - v4.0.0 Beta</b>\n\n"
+            f"<b>Status Global:</b> {'✅ OPERACIONAL' if report['global_health_score'] > 0.7 else '⚠️ ATENÇÃO'}\n"
+            f"<b>Score de Saúde:</b> {report['global_health_score'] * 100}%\n\n"
+            "<b>🖥️ Hardware (Nó Principal):</b>\n"
+            f"- CPU: {stats['cpu_percent']}%\n"
+            f"- RAM: {stats['memory']['percent']}%\n"
+        )
+        
+        if stats['gpu']:
+            gpu = stats['gpu'][0]
+            html_msg += f"- GPU: {gpu['name']} ({gpu['temperature']}°C)\n"
+            
+        html_msg += (
+            "\n<b>💰 Soberania Financeira:</b>\n"
+            f"- USDT: {balances.get('USDT', 0):.2f}\n"
+            f"- BTC: {balances.get('BTC', 0):.4f}\n"
+            f"- ETH: {balances.get('ETH', 0):.4f}\n\n"
+            "<b>🧠 Nós do Cluster:</b>\n"
+        )
+        
+        for node, info in node_manager.nodes.items():
+            status_emoji = "🟢" if info.get("status") == "online" else "🔴"
+            html_msg += f"- {node}: {status_emoji} {info.get('status')} ({info.get('latency_ms', 0):.1f}ms)\n"
+            
+        html_msg += f"\n<i>Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</i>"
+        
+        await notifier.send_message(html_msg)
+        logger.info("Primeiro relatório de saúde enviado ao Oráculo.")
+    except Exception as e:
+        logger.error(f"Falha ao enviar relatório de saúde: {e}")
+
 async def evolution_loop():
     while True:
         try:
             interval = node_manager.settings.get("evolution_engine", {}).get("evolution_cycle_interval", 1800)
             await asyncio.sleep(interval)
             logger.info("Iniciando ciclo automático de evolução v4.0.0 Beta...")
-            await evolution_engine.run_cycle()
+            
+            roi = bio_wealth_engine.calculate_real_time_roi()
+            history = wallet_manager.transaction_history[-20:]
+            await evolution_engine.run_cycle(roi, history)
+            
             node_manager.load_config() # Recarrega após mutação
+            bio_wealth_engine.reload_settings() # Sincronia de estratégia
+            p2p_consensus.update_local_state({"last_mutation_time": time.time()})
         except Exception as e:
             logger.error(f"Erro no loop de evolução: {e}")
             await asyncio.sleep(60)
@@ -532,24 +615,41 @@ async def get_assets():
 @app.get("/health")
 async def health():
     stats = telemetry.get_system_stats()
+    diag = ClusterDiagnostic()
+    diag_report = await diag.run_all()
+    
     return {
         "status": "SOVEREIGN_OPERATIONAL",
         "version": "4.0.0-Beta",
         "nodes": node_manager.nodes,
+        "p2p_mesh": p2p_consensus.get_mesh_status(),
         "telemetry": stats,
+        "diagnostics": diag_report,
+        "lattice": lattice_orchestrator.get_satellite_status(),
         "evolution": {
             "enabled": node_manager.settings.get("evolution_engine", {}).get("enabled", False),
             "auto_mutate": node_manager.settings.get("evolution_engine", {}).get("auto_mutate", False)
         },
-        "sovereignty_score": 0.99
+        "sovereignty_score": diag_report["global_health_score"]
     }
+
+@app.post("/p2p/sync")
+async def p2p_sync(request: Request):
+    data = await request.json()
+    sender = data.get("sender")
+    state = data.get("state")
+    if not sender or not state:
+        raise HTTPException(status_code=400, detail="Invalid P2P sync data")
+    
+    await p2p_consensus.handle_sync_request(sender, state)
+    return {"status": "synchronized"}
 
 async def forjar_task(topic: str):
     try:
-        # 1. Brain Drain gera o plano
-        plan = await brain_drain.generate_business_plan(topic)
+        # 1. Synthesis Core gera o plano
+        plan = await synthesis_core.generate_business_plan(topic)
         if "error" in plan:
-            await notifier.send_message(f"❌ <b>Erro no Brain Drain:</b> {plan['error']}")
+            await notifier.send_message(f"❌ <b>Erro no Synthesis Core:</b> {plan['error']}")
             return
 
         await notifier.send_message(f"🏗️ <b>Iniciando Forja Soberana:</b> {plan['name']}\nNicho: {plan['niche']}")
@@ -632,12 +732,16 @@ async def command(request: CommandRequest, background_tasks: BackgroundTasks):
     if cmd == "/STRIKE":
         asset = request.args.get("asset", "BTC/USDT")
         intensity = float(request.args.get("intensity", 1.0))
-        result = await bio_wealth_engine.run_strike(asset, intensity)
+        result = await bio_wealth_engine.run_strike(asset, intensity, reason="Intervenção Externa (Manual)")
         return {"status": "success", "result": result}
 
     if cmd == "/WALLET":
         balances = await wallet_manager.get_balances()
         return {"status": "success", "balances": balances, "history": wallet_manager.transaction_history[-5:]}
+
+    if cmd == "/LATTICE":
+        satellites = await lattice_orchestrator.sync_satellites()
+        return {"status": "success", "satellites": satellites}
 
     if cmd == "/GOD":
         context = await get_ancestral_context("origem do império e protocolos de segurança máximos")
@@ -681,12 +785,22 @@ async def command(request: CommandRequest, background_tasks: BackgroundTasks):
     
     if cmd == "/MUTAR":
         node_manager.load_config()
+        p2p_consensus.update_local_state({"last_mutation_time": time.time()})
         return {"status": "success", "message": "Supra-Codex mutado e recarregado."}
     
     if cmd == "/EVOLUIR":
-        result = await evolution_engine.run_cycle()
+        roi = bio_wealth_engine.calculate_real_time_roi()
+        history = wallet_manager.transaction_history[-10:]
+        result = await evolution_engine.run_cycle(roi, history)
         node_manager.load_config()
-        return {"status": "success", "evolution": result}
+        bio_wealth_engine.reload_settings()
+        p2p_consensus.update_local_state({"last_mutation_time": time.time()})
+        return {
+            "status": "success", 
+            "evolution": result,
+            "current_roi": roi,
+            "strategy_status": "OTIMIZADA" if result.get("status") == "success" else "MANTIDA"
+        }
 
     if cmd == "/CHRONOS":
         asset = request.args.get("asset", "BTC/USDT")
@@ -695,7 +809,7 @@ async def command(request: CommandRequest, background_tasks: BackgroundTasks):
         return {"status": "success", "result": result}
 
     if cmd == "/BRAINDRAIN":
-        result = await brain_drain.run()
+        result = await synthesis_core.run()
         return {"status": "success", "processed_files": result}
 
     if cmd == "/FORJAR":
@@ -745,13 +859,10 @@ async def harvest(request: HarvestRequest):
 @app.post("/distill")
 async def distill(request: DistillRequest):
     try:
-        response = await app.state.client.post(
-            "http://localhost:8001/distill",
-            json={"items": request.raw_data, "source": request.source},
-            timeout=30.0
-        )
-        return response.json()
-    except:
+        result = await synthesis_core.process_and_store(request.raw_data, request.source)
+        return {"status": "success", "result": result}
+    except Exception as e:
+        logger.error(f"Erro na destilação interna: {e}")
         return {"status": "fallback", "processed": len(request.raw_data)}
 
 @app.get("/market/intel")

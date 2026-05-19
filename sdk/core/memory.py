@@ -1,6 +1,6 @@
 """
-ANCESTRAL MEMORY v4.0.0 - Sistema de Memória Vetorial (RAG) Híbrido
-Suporte a múltiplos provedores (Gemini/Ollama) e operação offline.
+SOVEREIGN INTELLIGENCE SDK - ANCESTRAL MEMORY
+Sistema de Memória Vetorial (RAG) Híbrido
 """
 
 import os
@@ -13,8 +13,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - ANCESTRAL-MEMORY - %(levelname)s - %(message)s')
-logger = logging.getLogger("ANCESTRAL-MEMORY")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [SOVEREIGN-SDK] - %(levelname)s - %(message)s')
+logger = logging.getLogger("SOVEREIGN-SDK-MEMORY")
 
 class AncestralMemory:
     def __init__(self, db_path: str = "data/vector_db", provider: Optional[str] = None):
@@ -101,9 +101,3 @@ class AncestralMemory:
 
     def get_all_collections(self):
         return self.client.list_collections()
-
-if __name__ == "__main__":
-    # Teste de Inicialização Híbrida
-    memory = AncestralMemory()
-    print(f"Provedor Ativo: {memory.provider}")
-    print(f"Documentos na coleção {memory.provider}: {memory.count()}")

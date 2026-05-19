@@ -10,6 +10,13 @@
       "status": "ATIVADO",
       "codename": "SÍNTESE_TEMPORAL",
       "description": "Integração do motor CHRONOS para predição de lucros e RAG Ancestral.",
+      "p2p_consensus": {
+        "codename": "O_TELHADO",
+        "status": "ATIVADO",
+        "port_range": "50050-50059",
+        "gossip_interval": 10,
+        "sync_mode": "hybrid_grpc_rest"
+      },
       "entities_triads": {
         "CORE": [1, 15, 5],
         "MOTOR": [14, 2, 12],
@@ -75,6 +82,16 @@
       "hardware": "ROG Ally | 16GB RAM | Z1 Extreme",
       "priority": 3,
       "weight": 1.0,
+      "status": "operational"
+    },
+    "GHOST-EMPEROR": {
+      "id": "ghost-emperor-master",
+      "name": "GHOST-EMPEROR",
+      "endpoint": "http://localhost:8010",
+      "capabilities": ["master_control", "autonomous_orchestration", "elite_toolkit"],
+      "hardware": "Bare-Metal Sovereign",
+      "priority": 0,
+      "weight": 5.0,
       "status": "operational"
     }
   },
@@ -174,6 +191,11 @@
       "targets": ["github", "vercel", "glitch"],
       "status": "OPERACIONAL"
     },
+    "lattice_orchestrator": {
+      "enabled": true,
+      "db_sync": true,
+      "status": "OPERACIONAL"
+    },
     "nexus_dashboard": {
       "enabled": true,
       "port": 8080,
@@ -221,6 +243,14 @@
       "distiller_workers": 8,
       "max_content_length": 20000,
       "store_ttl_days": 14
+    },
+    "bio_wealth_strategy": {
+      "auto_strike_enabled": true,
+      "target_roi": 0.15,
+      "min_viability_threshold": 0.05,
+      "max_strike_intensity": 1.0,
+      "aggressive_mode": false,
+      "circuit_breaker_min_balance": 500.0
     },
     "proxies": [
       "http://proxy1.example.com:8080",
@@ -277,6 +307,11 @@
       "description": "Executa The Bridge para deploy",
       "requires": "the_bridge",
       "action": "qa -> build -> push -> restart"
+    },
+    "LATTICE": {
+      "description": "Gerencia e sincroniza a rede de repositórios satélites",
+      "requires": "lattice_orchestrator",
+      "action": "sync_assets -> list_satellites -> report_status"
     }
   },
   "modules": {
@@ -333,6 +368,10 @@
       "status": "OPERACIONAL"
     },
     "nexus_dashboard": {
+      "version": "1.0.0",
+      "status": "OPERACIONAL"
+    },
+    "lattice_orchestrator": {
       "version": "1.0.0",
       "status": "OPERACIONAL"
     }

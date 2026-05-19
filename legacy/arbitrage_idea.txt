@@ -1,5 +1,0 @@
-Ideia: Plataforma de arbitragem de tokens entre chains de segunda camada. 
-Usar bots de alta frequência.
-Foco em redes com taxas baixas como Solana e Base.
-O lucro viria do spread entre as corretoras descentralizadas.
-Necessário monitoramento em tempo real.

@@ -28,6 +28,9 @@ Repositório central do ecossistema **Império Mutante v4.0.0 Alpha**, agora com
 *   **Otimização Ryzen 9**: Paralelização total de 32 threads para modelos Llama 3 e DeepSeek rodando localmente.
 *   **Setup Bare-Metal**: Implantação rápida do ecossistema de IA local via `setup_local_ai.sh`.
 
+## 🏰 Soberania Digital Definitiva
+O Império Mutante v4.0.0 não é apenas um software; é uma declaração de independência. Operando em hardware bare-metal, eliminamos a dependência de intermediários. O processamento é distribuído, auditável e resiliente, garantindo que a inteligência permaneça sob controle absoluto do soberano, mesmo em cenários de isolamento digital.
+
 ## 🛠️ Como Iniciar a Operação
 
 1. **Setup de IA Local**:

@@ -81,7 +81,7 @@ class TelemetryCollector:
     Coleta telemetria de todos os nós e componentes do sistema.
     """
     
-    def __init__(self, config_path: str = "legacy/supra_codex.json"):
+    def __init__(self, config_path: str = "config/supra_codex.json"):
         self.config_path = config_path
         self.history: List[TelemetrySnapshot] = []
         self.max_history = 100
@@ -167,7 +167,7 @@ class TelemetryCollector:
     
     def _get_nectar_count(self) -> int:
         try:
-            with open("legacy/supra_codex.json", "r") as f:
+            with open("config/supra_codex.json", "r") as f:
                 return 0
         except:
             return 0
@@ -334,7 +334,7 @@ class CodexMutator:
     Mantém backup e validação das mudanças.
     """
     
-    def __init__(self, config_path: str = "legacy/supra_codex.json"):
+    def __init__(self, config_path: str = "config/supra_codex.json"):
         self.config_path = config_path
         self.backup_path = config_path + ".backup"
         self.mutation_log: List[Dict[str, Any]] = []

@@ -6,7 +6,7 @@ import asyncio
 from datetime import datetime
 import os
 
-app = FastAPI(title="NEXUS COCKPIT v3.3.1")
+app = FastAPI(title="NEXUS COCKPIT v4.0.0 Beta")
 
 # URL do Nexus Core para buscar dados reais
 NEXUS_URL = os.getenv("NEXUS_URL", "http://localhost:8000")
@@ -17,7 +17,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS COCKPIT v3.3.1</title>
+    <title>NEXUS COCKPIT v4.0.0 Beta</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -94,7 +94,7 @@ HTML_TEMPLATE = """
 
     <header class="mb-8 border-b border-green-900 pb-6 flex flex-col md:flex-row justify-between items-end">
         <div>
-            <h1 class="text-3xl md:text-5xl font-bold glitch-text orbitron">🦾 NEXUS COCKPIT v3.3.1</h1>
+            <h1 class="text-3xl md:text-5xl font-bold glitch-text orbitron">🦾 NEXUS COCKPIT v4.0.0 Beta</h1>
             <p class="text-xs md:text-sm tracking-widest opacity-70 mt-2 uppercase">SISTEMA DE IGNIÇÃO OPERACIONAL ATIVADO | CLUSTER: SPECTRUM-NEURO-GLITCH</p>
         </div>
         <div class="text-right mt-4 md:mt-0">
@@ -166,6 +166,32 @@ HTML_TEMPLATE = """
                     <!-- Nodes will be injected here -->
                 </div>
             </div>
+
+            <div class="cyber-card p-6 rounded-none">
+                <h3 class="text-lg font-bold mb-4 uppercase text-blue-400">MALHA P2P - O TELHADO</h3>
+                <div id="p2p-mesh" class="space-y-4">
+                    <div class="flex justify-between items-center text-xs">
+                        <span>ESTADO DE CONSENSO:</span>
+                        <span id="consensus-status" class="text-green-400">SINCRONIZADO</span>
+                    </div>
+                    <div class="h-32 bg-black bg-opacity-50 relative overflow-hidden border border-green-900 border-opacity-30" id="mesh-container">
+                         <div id="mesh-visual" class="w-full h-full flex justify-around items-center">
+                            <!-- P2P Visualization nodes will be here -->
+                         </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[9px] opacity-60">
+                        <div>LAST MUTATION: <span id="last-mutation-hash" class="text-white text-bold">-</span></div>
+                        <div>ACTIVE PEERS: <span id="active-peers-count" class="text-white">0</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cyber-card p-6 rounded-none">
+                <h3 class="text-lg font-bold mb-4 uppercase">Lattice Satellite Network</h3>
+                <div id="satellites-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Satellites will be injected here -->
+                </div>
+            </div>
         </div>
 
         <!-- Console / Logs -->
@@ -173,7 +199,7 @@ HTML_TEMPLATE = """
             <div class="cyber-card p-4 rounded-none h-full flex flex-col">
                 <h3 class="text-xs font-bold mb-3 border-b border-green-900 pb-2 uppercase">Neural Link Log</h3>
                 <div id="console-logs" class="text-[10px] font-mono space-y-1 overflow-y-auto flex-grow max-h-[600px]">
-                    <div>[SYSTEM] Cockpit v3.3.1 Initialized...</div>
+                    <div>[SYSTEM] Cockpit v4.0.0 Beta Initialized...</div>
                     <div>[SYSTEM] Establishing gRPC Bridge...</div>
                 </div>
             </div>
@@ -243,7 +269,7 @@ HTML_TEMPLATE = """
                     const indicator = document.getElementById('status-indicator');
                     const statusText = document.getElementById('status-text');
                     
-                    if (data.status === 'ONLINE' || data.status === 'ACTIVE') {
+                    if (data.status === 'ONLINE' || data.status === 'ACTIVE' || data.status === 'SOVEREIGN_OPERATIONAL') {
                         statusEl.style.color = '#00ff41';
                         indicator.className = 'w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#0f0]';
                         statusText.innerText = 'Sistemas Operacionais';
@@ -259,19 +285,27 @@ HTML_TEMPLATE = """
                 document.getElementById('score-bar').style.width = score + '%';
                 
                 const profit = data.arbitrage_profit || 0;
-                document.getElementById('arbitrage-profit').innerText = `$${profit.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+                document.getElementById('arbitrage-profit').innerText = `${profit.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
 
                 const tel = data.telemetry || {};
-                document.getElementById('cpu-usage').innerText = (tel.cpu_usage || 0).toFixed(1) + '%';
-                document.getElementById('ram-usage').innerText = (tel.memory_usage || 0).toFixed(1) + '%';
-                document.getElementById('gpu-load').innerText = (tel.gpu?.load || 0).toFixed(1) + '%';
-                document.getElementById('gpu-temp').innerText = (tel.gpu?.temp || 0).toFixed(1) + '°C';
+                document.getElementById('cpu-usage').innerText = (tel.cpu_percent || 0).toFixed(1) + '%';
+                document.getElementById('ram-usage').innerText = (tel.memory?.percent || 0).toFixed(1) + '%';
+                
+                let gpuLoad = 0;
+                let gpuTemp = 0;
+                if (tel.gpu && tel.gpu.length > 0) {
+                    gpuLoad = tel.gpu[0].utilization;
+                    gpuTemp = tel.gpu[0].temperature;
+                }
+
+                document.getElementById('gpu-load').innerText = gpuLoad.toFixed(1) + '%';
+                document.getElementById('gpu-temp').innerText = gpuTemp.toFixed(1) + '°C';
 
                 // Update Chart
                 telemetryChart.data.datasets[0].data.shift();
-                telemetryChart.data.datasets[0].data.push(tel.cpu_usage || 0);
+                telemetryChart.data.datasets[0].data.push(tel.cpu_percent || 0);
                 telemetryChart.data.datasets[1].data.shift();
-                telemetryChart.data.datasets[1].data.push(tel.gpu?.load || 0);
+                telemetryChart.data.datasets[1].data.push(gpuLoad || 0);
                 telemetryChart.update('none');
 
                 const nodesList = document.getElementById('nodes-list');
@@ -281,10 +315,15 @@ HTML_TEMPLATE = """
                 for (const [id, node] of Object.entries(nodes)) {
                     const isOnline = node.status === 'online' || node.status === 'active';
                     const statusColor = isOnline ? 'var(--neon-green)' : 'var(--neon-red)';
+                    
+                    let specs = "";
+                    if (id === "NEURO-TOXIN") specs = "<br><span class='text-[8px] opacity-40'>Ryzen 9 / RTX 3070</span>";
+                    if (id === "SPECTRUM") specs = "<br><span class='text-[8px] opacity-40'>RTX 3050</span>";
+
                     const html = `
                         <div class="p-3 border border-green-900 bg-black bg-opacity-40">
                             <div class="flex justify-between items-center mb-2">
-                                <span class="text-[10px] font-bold orbitron">${id}</span>
+                                <span class="text-[10px] font-bold orbitron">${id} ${specs}</span>
                                 <div class="w-1.5 h-1.5 rounded-full ${isOnline ? 'animate-pulse' : ''}" style="background-color: ${statusColor}; box-shadow: 0 0 5px ${statusColor}"></div>
                             </div>
                             <div class="text-[9px] opacity-60 uppercase">Latency</div>
@@ -294,8 +333,64 @@ HTML_TEMPLATE = """
                     nodesList.innerHTML += html;
                 }
 
-                if (data.status === 'OFFLINE') {
-                   // Optional: add offline log once
+                const satellitesList = document.getElementById('satellites-list');
+                satellitesList.innerHTML = '';
+                const satellites = data.lattice || [];
+
+                satellites.forEach(sat => {
+                    const statusColor = sat.status === 'DEPLOYED' ? 'var(--neon-green)' : 'var(--neon-blue)';
+                    const html = `
+                        <div class="p-3 border border-blue-900 bg-black bg-opacity-40">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-[10px] font-bold orbitron">${sat.name}</span>
+                                <div class="w-1.5 h-1.5 rounded-full" style="background-color: ${statusColor}; box-shadow: 0 0 5px ${statusColor}"></div>
+                            </div>
+                            <div class="text-[9px] opacity-60 uppercase">Repository</div>
+                            <div class="text-[10px] truncate">${sat.repository}</div>
+                            <div class="mt-2 text-[8px] opacity-40 italic">Status: ${sat.status}</div>
+                        </div>
+                    `;
+                    satellitesList.innerHTML += html;
+                });
+
+                // Update P2P Mesh
+                if (data.p2p_mesh) {
+                    const mesh = data.p2p_mesh;
+                    document.getElementById('last-mutation-hash').innerText = mesh.state.last_mutation_hash || '0x00000000';
+                    document.getElementById('active-peers-count').innerText = mesh.state.active_nodes.length;
+                    
+                    const visual = document.getElementById('mesh-visual');
+                    visual.innerHTML = '';
+                    
+                    // Current node
+                    visual.innerHTML += `
+                        <div class="flex flex-col items-center">
+                            <div class="w-8 h-8 rounded-full border-2 border-green-500 bg-green-900 flex items-center justify-center text-[10px] font-bold">CORE</div>
+                            <span class="text-[8px] mt-1">NEXUS</span>
+                        </div>
+                    `;
+
+                    // Peers
+                    mesh.peers.forEach(peer => {
+                        const isActive = mesh.state.active_nodes.includes(peer);
+                        const color = isActive ? 'green' : 'gray';
+                        visual.innerHTML += `
+                            <div class="w-4 h-[1px] bg-${color}-500 opacity-50"></div>
+                            <div class="flex flex-col items-center">
+                                <div class="w-6 h-6 rounded-full border border-${color}-500 bg-${color}-900 flex items-center justify-center text-[8px]">${peer[0]}</div>
+                                <span class="text-[6px] mt-1">${peer}</span>
+                            </div>
+                        `;
+                    });
+
+                    const consensusStatus = document.getElementById('consensus-status');
+                    if (mesh.is_synchronized) {
+                        consensusStatus.innerText = 'SINCRONIZADO';
+                        consensusStatus.className = 'text-green-400';
+                    } else {
+                        consensusStatus.innerText = 'DIVERGENTE';
+                        consensusStatus.className = 'text-yellow-400';
+                    }
                 }
 
             } catch (error) {
@@ -336,9 +431,9 @@ async def get_api_health():
                 "sovereignty_score": 0.0,
                 "arbitrage_profit": 0.0,
                 "telemetry": {
-                    "cpu_usage": 0,
-                    "memory_usage": 0,
-                    "gpu": {"load": 0, "temp": 0}
+                    "cpu_percent": 0,
+                    "memory": {"percent": 0},
+                    "gpu": []
                 },
                 "nodes": {
                     "SPECTRUM": {"status": "offline", "latency_ms": 0},
@@ -346,6 +441,7 @@ async def get_api_health():
                     "GLITCH": {"status": "offline", "latency_ms": 0}
                 }
             }
+
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))

@@ -16,33 +16,50 @@ class LocalBrainBridge:
         self.ollama_url = ollama_url
         self.timeout_threshold = 3.0  # Limite de 3 segundos para o Gemini
 
+    def _is_complex(self, prompt: str) -> bool:
+        """Determina se o prompt exige maior capacidade de processamento (Gemini) ou se pode ser local (Ollama)."""
+        complex_terms = ["analise", "estratégia", "síntese", "previsão", "correlação", "otimização", "complexo"]
+        return len(prompt) > 500 or any(term in prompt.lower() for term in complex_terms)
+
     async def generate_content(self, prompt: str, model_local: str = "llama3") -> str:
         """
-        Tenta gerar conteúdo usando Gemini (Cloud).
-        Se a latência for > 3s ou houver falha, faz fallback automático para Ollama (Local).
+        Roteamento híbrido inteligente (Gemini/Ollama) baseado em complexidade e latência.
+        - Tasks complexas -> Gemini (com fallback para Ollama se > 3s ou falha).
+        - Tasks simples -> Ollama (com fallback para Gemini se falha).
         """
-        if self.gemini_api_key:
+        is_complex = self._is_complex(prompt)
+        
+        if is_complex and self.gemini_api_key:
+            logger.info("🧠 Task COMPLEXA detectada. Roteando para Gemini Cloud...")
             try:
                 start_time = time.time()
-                # Tenta Gemini com timeout estrito
                 content = await self._generate_gemini(prompt)
                 latency = time.time() - start_time
                 
-                if latency > self.timeout_threshold:
-                    logger.warning(f"⚠️ Latência do Gemini ({latency:.2f}s) excedeu o limite de {self.timeout_threshold}s.")
-                    # Poderíamos forçar o fallback aqui, mas o _generate_gemini já deve ter retornado se não deu timeout.
-                    # No entanto, a regra diz: "se a latência for > 3s... redireciona".
-                    # Se o _generate_gemini demorou 4s mas não deu timeout no wait_for, ainda queremos fallback para a próxima ou essa?
-                    # O wait_for(timeout=3.0) já garante que se passar de 3s ele lança TimeoutError.
+                if latency <= self.timeout_threshold:
+                    return content
                 
-                return content
+                logger.warning(f"⚠️ Latência do Gemini ({latency:.2f}s) excedeu o limite. Acionando NEURO-TOXINA (Local)...")
             except (asyncio.TimeoutError, Exception) as e:
-                logger.error(f"🚨 Falha ou latência excessiva no Gemini: {type(e).__name__}. Acionando Cérebro Local (NEURO-TOXINA)...")
-        
-        # Fallback para IA Local (Ollama)
-        return await self._generate_local(prompt, model_local)
+                logger.error(f"🚨 Falha no Gemini: {type(e).__name__}. Acionando Cérebro Local...")
+
+        # Execução via Ollama (ou fallback de Gemini)
+        try:
+            return await self._generate_local(prompt, model_local)
+        except Exception as e:
+            # Se Ollama falhar para uma task simples, tenta Gemini como último recurso
+            if not is_complex and self.gemini_api_key:
+                logger.warning(f"Ollama falhou para tarefa simples, tentando Gemini como reserva...")
+                try:
+                    return await self._generate_gemini(prompt)
+                except Exception as e2:
+                    return f"ERRO_SISTEMICO: IA Local e Cloud indisponíveis. Detalhe: {e2}"
+            
+            return f"ERRO_SISTEMICO: Falha crítica na IA Local: {e}"
 
     async def _generate_gemini(self, prompt: str) -> str:
+        if not self.gemini_api_key:
+            raise ValueError("Gemini API Key ausente.")
         model = genai.GenerativeModel('gemini-1.5-flash')
         response = await asyncio.wait_for(
             asyncio.to_thread(model.generate_content, prompt),
@@ -52,25 +69,20 @@ class LocalBrainBridge:
 
     async def _generate_local(self, prompt: str, model_name: str) -> str:
         logger.info(f"🧠 Processando via IA Local ({model_name}) no nó NEURO-TOXINA...")
-        try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(
-                    f"{self.ollama_url}/api/generate",
-                    json={
-                        "model": model_name,
-                        "prompt": prompt,
-                        "stream": False
-                    }
-                )
-                if response.status_code == 200:
-                    result = response.json().get("response", "")
-                    # Limpeza básica de tags markdown se houver
-                    return result.strip()
-                else:
-                    return f"Erro no Ollama: {response.status_code} - {response.text}"
-        except Exception as e:
-            logger.error(f"❌ Falha crítica ao conectar com Ollama: {e}")
-            return f"ERRO_SISTEMICO: IA Local e Cloud indisponíveis. Detalhe: {e}"
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"{self.ollama_url}/api/generate",
+                json={
+                    "model": model_name,
+                    "prompt": prompt,
+                    "stream": False
+                }
+            )
+            if response.status_code == 200:
+                result = response.json().get("response", "")
+                return result.strip()
+            else:
+                raise Exception(f"Erro no Ollama: {response.status_code}")
 
     async def get_status(self) -> Dict[str, Any]:
         """Retorna o status de saúde dos cérebros (Cloud e Local)."""
